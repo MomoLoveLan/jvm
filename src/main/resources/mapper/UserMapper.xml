@@ -1,0 +1,317 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybaits.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.momo.lan.jvm.mapper.UserMapper">
+
+    <resultMap type="com.momo.lan.jvm.entity.User" id="findUserMap">
+        <!-- 结果集的主键 -->
+        <id column="ID" property="id" />
+        <!-- 普通的列  -column 是数据库中字段， property是实体类中字段-->
+        <result column="NAME" property="name" />
+        <result column="AGE" property="age" />
+    </resultMap>
+
+    <sql id="selectAllUserSql">
+        SELECT A.ID, A.NAME, A.AGE
+        FROM TEST A
+    </sql>
+
+    <!--<insert id="save" parameterType="com.momo.lan.jvm.entity.User" >
+        &lt;!&ndash;selectKey  会将 SELECT LAST_INSERT_ID()的结果放入到传入的model的主键里面，
+            keyProperty 对应的model中的主键的属性名，这里是 user 中的id，因为它跟数据库的主键对应
+            order AFTER 表示 SELECT LAST_INSERT_ID() 在insert执行之后执行,多用与自增主键，
+                  BEFORE 表示 SELECT LAST_INSERT_ID() 在insert执行之前执行，这样的话就拿不到主键了，
+                        这种适合那种主键不是自增的类型
+            resultType 主键类型 &ndash;&gt;
+        <selectKey keyProperty="id" order="AFTER" resultType="java.lang.Integer">
+            select LAST_INSERT_ID()
+        </selectKey>
+        insert into fx_wechat_user (user_phone,open_id,cloud_id,user_name,card_num,user_gender,create_time,update_time,operator,user_state,software_id)
+        values(#{userPhone},#{openId},#{cloudId},#{userName},#{cardNum},#{userGender},#{createTime},#{updateTime},#{operator},0,#{softwareId})
+    </insert>-->
+
+    <!--  -->
+    <select id="getUser" parameterType="string" resultMap="findUserMap">
+        <include refid="selectAllUserSql" />
+        where A.NAME=#{name}
+    </select>
+
+    <!--&lt;!&ndash; 通过open_id 状态为0 查询该微信号下的用户信息列表 &ndash;&gt;
+    <select id="findUserByOpenIdAndUserState" resultMap="findUserMap">
+        <include refid="selectAllUserSql" />
+        where A.USER_STATE=#{userState} AND A.OPEN_ID=#{openId}
+    </select>
+
+    &lt;!&ndash; 通过open_id 状态为0 更新一条用户信息 &ndash;&gt;
+    <update id="updateUserByOpenId" parameterType="boco.fengxian.entity.User">
+        UPDATE FX_WECHAT_USER
+        <set>
+            <if test="userPhone != null">
+                USER_PHONE=#{userPhone},
+            </if>
+            <if test="userName != null">
+                USER_NAME=#{userName},
+            </if>
+            <if test="cardNum != null">
+                CARD_NUM=#{cardNum},
+            </if>
+            <if test="userGender != null">
+                USER_GENDER=#{userGender},
+            </if>
+            <if test="updateTime != null">
+                UPDATE_TIME=#{updateTime},
+            </if>
+            <if test="operator != null">
+                OPERATOR=#{operator},
+            </if>
+        </set>
+        WHERE
+        OPEN_ID=#{openId} AND USER_STATE=0
+    </update>
+    &lt;!&ndash; 通过cloud_id 状态为0 更新一条用户信息 &ndash;&gt;
+    <update id="updateUserByCloudId" parameterType="boco.fengxian.entity.User">
+        UPDATE FX_WECHAT_USER
+        <set>
+            <if test="userPhone != null">
+                USER_PHONE=#{userPhone},
+            </if>
+            <if test="userName != null">
+                USER_NAME=#{userName},
+            </if>
+            <if test="cardNum != null">
+                CARD_NUM=#{cardNum},
+            </if>
+            <if test="userGender != null">
+                USER_GENDER=#{userGender},
+            </if>
+            <if test="updateTime != null">
+                UPDATE_TIME=#{updateTime},
+            </if>
+            <if test="operator != null">
+                OPERATOR=#{operator},
+            </if>
+        </set>
+        WHERE
+        CLOUD_ID=#{cloudId} AND USER_STATE=0
+    </update>
+    <select id="findUserList" resultMap="findUserMap">
+        <include refid="selectAllUserSql" />
+        where A.USER_STATE=0
+    </select>
+
+    <select id="findUserNum" resultType="java.lang.Integer">
+        select count(*) from fx_wechat_user where user_state=0
+    </select>
+
+    &lt;!&ndash;0.1 首页-用户性别&ndash;&gt;
+    <select id="findUserGenderSum" resultMap="boco.fengxian.mapper.OrderMapper.findExcelFormList">
+        select GENDER_MAN_SUM,GENDER_WOMAN_SUM from
+        (select count(*) GENDER_MAN_SUM from fx_wechat_user where user_gender='男' and user_state=0) a,
+        (select count(*) GENDER_WOMAN_SUM from fx_wechat_user where user_gender='女' and user_state=0) b
+        LIMIT 1
+    </select>
+    &lt;!&ndash;0.2 首页-用户年龄分布&ndash;&gt;
+    <select id="findUserGenderDistribution" resultMap="findUserMap">
+        select card_num from fx_wechat_user where user_state=0
+    </select>
+    &lt;!&ndash;0.3 首页-运营商用户对比&ndash;&gt;
+    <select id="findUserOperatorDistribution" resultMap="boco.fengxian.mapper.OrderMapper.findExcelFormList">
+        select a.Day_OR_MONTH_SUM, b.operator from (
+        select OPERATOR tt, count(*) Day_OR_MONTH_SUM,USER_STATE from fx_wechat_user
+        group by tt having user_state = 0) a right join
+        (select operator from fx_wechat_flow group by operator) b on a.tt = b.operator
+    </select>
+    &lt;!&ndash;0.4 首页-各区域流量包对比-昨日-近7天-近30天&ndash;&gt;
+    <select id="findOrderAreaListFlow" resultMap="boco.fengxian.mapper.OrderMapper.findExcelFormList">
+        select date_format(order_time,'%Y-%m-%d') DATE,order_time,AREA_NAME,count(*) DAY_OR_MONTH_SUM from fx_wechat_order group by DATE,area_name having
+        DATE_FORMAT(order_time,'%Y-%m-%d') between DATE_FORMAT(date_sub(curdate(), interval #{avgMonth} day),'%Y-%m-%d') and
+        DATE_FORMAT(date_sub(curdate(), interval #{riseDay} day),'%Y-%m-%d') order by date desc
+    </select>
+    &lt;!&ndash;0.5 首页-本月发放流量包趋势&ndash;&gt;
+    <select id="findOrderFlowList" resultMap="boco.fengxian.mapper.OrderMapper.findExcelFormList">
+        <if test="1==avgMonth">
+            select date_format(order_time,'%H') DATE,order_time,count(*) DAY_OR_MONTH_SUM from fx_wechat_order
+            where TO_DAYS( NOW( ) ) - TO_DAYS( order_time) <![CDATA[=]]> 1 group by DATE
+            &lt;!&ndash;SELECT
+            dayHour DATE,
+            IF(DAY_OR_MONTH_SUM IS NULL, 0, DAY_OR_MONTH_SUM) DAY_OR_MONTH_SUM
+            FROM (
+            select date_format(order_time,'%H') DATE,order_time,count(*) DAY_OR_MONTH_SUM from fx_wechat_order
+            where  TO_DAYS( NOW( ) ) - TO_DAYS( order_time) = 1 group by DATE
+            ) A
+            RIGHT JOIN (SELECT one.hours + two.hours AS dayHour
+            FROM (SELECT 0 hours
+            UNION ALL SELECT 1 hours
+            UNION ALL SELECT 2 hours
+            UNION ALL SELECT 3 hours
+            UNION ALL SELECT 4 hours
+            UNION ALL SELECT 5 hours
+            UNION ALL SELECT 6 hours
+            UNION ALL SELECT 7 hours
+            UNION ALL SELECT 8 hours
+            UNION ALL SELECT 9 hours) one
+            CROSS JOIN (SELECT 0 hours
+            UNION ALL SELECT 10 hours
+            UNION ALL SELECT 20 hours) two
+            WHERE (one.hours + two.hours) &lt; 24) B ON A.DATE = CONVERT(B.dayHour, SIGNED)
+            ORDER BY dayHour&ndash;&gt;
+        </if>
+        <if test="30==avgMonth">
+            &lt;!&ndash;select date_format(order_time,'%m-%d') DATE,order_time,count(*) DAY_OR_MONTH_SUM from fx_wechat_order group by DATE having
+            DATE_SUB(CURDATE(), INTERVAL 30 DAY) <![CDATA[<=]]> date(order_time)&ndash;&gt;
+            select date_format(order_time,'%m-%d') DATE,order_time,count(*) DAY_OR_MONTH_SUM from fx_wechat_order
+            where DATE_SUB(CURDATE(), INTERVAL 30 DAY) <![CDATA[<=]]> date(order_time) group by DATE
+        </if>
+    </select>
+
+    &lt;!&ndash;1.1 用户 日新增-用户数、月均增-用户数&ndash;&gt;
+    <select id="findUserAllDayList" resultMap="boco.fengxian.mapper.OrderMapper.findExcelFormList">
+        select T.create_day DATE,T.count_day RISE_DAY,floor(sum_day/day_num) AVG_MONTH from(
+        select a.count_day, a.create_day, a.create_month, sum(b.count_day) sum_day, sum(b.ccc) day_num from
+        (select *, count(*) count_day,date_format(create_time,'%m-%d') create_day,date_format(create_time,'%Y-%m') create_month
+        from fx_wechat_user group by create_day having user_state=0 and
+        DATE_FORMAT(create_time,'%Y-%m-%d') > date_format(date_sub(curdate(), interval 30 day),'%Y-%m-%d')) a
+        join (select *, count(*) ccc from (select user_state,count(*) count_day,date_format(create_time,'%m-%d') create_day,
+        date_format(create_time,'%Y-%m') create_month from fx_wechat_user group by create_day having user_state=0) c
+        group by create_day) b
+        on  a.create_day>=b.create_day and a.create_month=b.create_month group by a.create_day) T order by date desc
+    </select>
+    &lt;!&ndash;1.2 用户-全量-月粒度  月新增-年均增&ndash;&gt;
+    <select id="findUserAllMonthList" resultMap="boco.fengxian.mapper.OrderMapper.findExcelFormList">
+        select T.create_month DATE,T.count_month RISE_DAY,floor(sum_month/month_num) AVG_MONTH from(
+        select a.count_month, a.create_month, a.create_year, sum(b.count_month) sum_month, sum(b.ccc) month_num from
+        (select user_state,create_time, count(*) count_month,date_format(create_time,'%Y-%m') create_month,
+        date_format(create_time,'%Y') create_year
+        from fx_wechat_user group by create_month having user_state=0 and
+        DATE_FORMAT(create_time,'%Y-%m') > date_format(date_sub(curdate(), interval 12 month),'%Y-%m')) a
+        join (select *, count(*) ccc from (select user_state,count(*) count_month,date_format(create_time,'%Y-%m') create_month,
+        date_format(create_time,'%Y') create_year from fx_wechat_user group by create_month having user_state=0) c
+        group by create_month) b
+        on  a.create_month>=b.create_month and a.create_year=b.create_year group by a.create_month) T order by date desc
+    </select>
+    &lt;!&ndash;1.3 用户-运营商-天粒度;前端展示&ndash;&gt;
+    <select id="findUserOperatorDayList" resultMap="boco.fengxian.mapper.OrderMapper.findExcelFormList">
+        select DATE,OPERATOR,DAY_OR_MONTH_SUM from (
+        select date_format(create_time,'%m-%d') DATE,date_format(create_time,'%Y-%m-%d') DAY,OPERATOR,count(*) DAY_OR_MONTH_SUM from
+        fx_wechat_user where DATE_FORMAT(create_time,'%Y-%m-%d') > date_format(date_sub(curdate(), interval 30 day),'%Y-%m-%d')
+        group by DAY,operator) T order by date desc
+    </select>
+    &lt;!&ndash;1.4 用户-运营商-月粒度;前端展示&ndash;&gt;
+    <select id="findUserOperatorMonthList" resultMap="boco.fengxian.mapper.OrderMapper.findExcelFormList">
+        select date_format(create_time,'%Y-%m') DATE,OPERATOR,count(*) DAY_OR_MONTH_SUM from
+        fx_wechat_user where DATE_FORMAT(create_time,'%Y-%m') > date_format(date_sub(curdate(), interval 12 month),'%Y-%m')
+        group by DATE,operator order by date desc
+    </select>
+
+    &lt;!&ndash;000、查询平台总关注数&ndash;&gt;
+    <select id="findIfengxianSum" resultType="int">
+        select count(*) from wx_buddies
+    </select>
+
+    &lt;!&ndash;101、平台历史注册总人数&ndash;&gt;
+    <select id="findUserHistorySum" resultType="int">
+        select count(*) from fx_wechat_user
+    </select>
+
+    &lt;!&ndash;102、平台历史注册总人数-分时间段&ndash;&gt;
+    <select id="findUserHistorySumByDate1ToDate2" resultType="int">
+        select count(*) from
+        (select date_format(create_time,'%Y-%m-%d') datess from fx_wechat_user) T
+        where T.datess between #{startTime} and #{endTime}
+    </select>
+
+    &lt;!&ndash;103、平台历史注册总人数-分运营商&ndash;&gt;
+    <select id="findUserHistorySumByOperator" resultMap="boco.fengxian.mapper.OrderMapper.findExcelFormList">
+        select operator,count(*) num from fx_wechat_user group by operator
+    </select>
+
+    &lt;!&ndash;104、平台历史注册总人数-分时间段-分运营商&ndash;&gt;
+    <select id="findUserHistorySumByDate1ToDate2AndOperator" resultMap="boco.fengxian.mapper.OrderMapper.findExcelFormList">
+        select operator, count(*) num from
+        (select date_format(create_time,'%Y-%m-%d') DAY , operator  from fx_wechat_user)
+        T  where T.DAY between #{startTime} and #{endTime} group by T.operator
+    </select>
+
+
+
+    &lt;!&ndash;201、平台历史订购数&ndash;&gt;
+    <select id="findOrderHistorySum" resultType="int">
+        select count(*) from fx_wechat_order
+    </select>
+
+    &lt;!&ndash;202、平台历史订购数-分时间段&ndash;&gt;
+    <select id="findOrderHistorySumByDate1ToDate2" resultType="int">
+        select count(*) from
+        (select date_format(order_time,'%Y-%m-%d') datess from fx_wechat_order) T
+        where T.datess between #{startTime} and #{endTime}
+    </select>
+
+    &lt;!&ndash;203、平台历史订购数-分运营商&ndash;&gt;
+    <select id="findOrderHistorySumByOperator" resultMap="boco.fengxian.mapper.OrderMapper.findExcelFormList">
+        select operator,count(*) num from fx_wechat_order group by operator
+    </select>
+
+    &lt;!&ndash;204、平台历史订购数-分时间段-分运营商&ndash;&gt;
+    <select id="findOrderHistorySumByDate1ToDate2AndOperator" resultMap="boco.fengxian.mapper.OrderMapper.findExcelFormList">
+        select operator, count(*) num from
+        (select date_format(order_time,'%Y-%m-%d') DAY , operator  from fx_wechat_order)
+        T  where T.DAY between #{startTime} and #{endTime} group by T.operator
+    </select>
+
+
+
+    &lt;!&ndash;301、请求日志表，请求次数&ndash;&gt;
+    <select id="findMsgSum" resultType="int">
+        select count(*) num from fx_wechat_resultmsg
+    </select>
+
+    &lt;!&ndash;302、请求日志表，查result_msg和num&ndash;&gt;
+    <select id="findTodayMsgList" resultMap="boco.fengxian.mapper.OrderMapper.findExcelFormList">
+        select T.num,T.result_msg operator from
+        (select count(*) num,a.result_msg,a.order_time from fx_wechat_resultmsg a where
+        date_format(a.order_time,'%Y-%m-%d') = DATE_FORMAT(now(),'%Y-%m-%d')
+        group by a.result_msg ) T;
+    </select>
+
+    &lt;!&ndash;303、请求日志表，根据开始时间，截止时间&ndash;&gt;
+    <select id="findMsgListByDate1ToDate2" resultMap="boco.fengxian.mapper.OrderMapper.findExcelFormList">
+        select T.num,T.result_msg operator from (
+        select count(*) num,a.result_msg,a.order_time from fx_wechat_resultmsg a where
+        date_format(a.order_time,'%Y-%m-%d') between
+        DATE_FORMAT(#{startTime},'%Y-%m-%d') and DATE_FORMAT(#{endTime},'%Y-%m-%d')
+        group by a.result_msg
+        ) T;
+    </select>
+
+    &lt;!&ndash;304、请求日志表，根据开始时间，截止时间，结果result_msg&ndash;&gt;
+    <select id="findMsgListByDate1ToDate2AndOperator" resultMap="boco.fengxian.mapper.OrderMapper.findExcelFormList">
+        select count(*) num, T.phone operator from (
+        select a.result_msg,a.order_time,phone from fx_wechat_resultmsg a where
+        date_format(a.order_time,'%Y-%m-%d') between
+        DATE_FORMAT(#{startTime},'%Y-%m-%d') and DATE_FORMAT(#{endTime},'%Y-%m-%d')
+        and a.result_msg=#{resultMsg}
+        ) T group by T.phone;
+    </select>
+    &lt;!&ndash;305、某一个时间段内，所有运营商或某一个运营商的经纬度集合  如果operator =='运营商'就是查询全部&ndash;&gt;
+    <select id="findMsgAndLngLatByDate1ToDate2AndOperator" resultMap="boco.fengxian.mapper.ResultMsgMapper.findResultMsgMap">
+        select result_msg, lng_lat from fx_wechat_resultmsg a
+        <where>
+            date_format(a.order_time,'%Y-%m-%d') between
+                DATE_FORMAT(#{startTime},'%Y-%m-%d') and DATE_FORMAT(#{endTime},'%Y-%m-%d')
+            <if test="operator !='运营商'">
+                and a.operator = #{operator}
+            </if>
+        </where>
+    </select>
+
+    &lt;!&ndash;根据cloudId获取用户对象&ndash;&gt;
+    <select id="findUserListByCloudId" resultMap="findUserMap">
+        <include refid="selectAllUserSql" />
+        where A.USER_STATE=0 AND A.CLOUD_ID = #{cloudId} limit 1
+    </select>
+    &lt;!&ndash;根据手机号和cloudId获取用户对象&ndash;&gt;
+    <select id="findUserByUserPhoenAndCloudId" resultMap="findUserMap">
+        <include refid="selectAllUserSql" />
+        where A.USER_STATE=0 AND A.USER_PHONE = #{userPhone} AND A.CLOUD_ID = #{cloudId} limit 1
+    </select>-->
+
+</mapper>
